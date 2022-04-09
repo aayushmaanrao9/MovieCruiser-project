@@ -1,0 +1,2 @@
+insert into Authentication_request (user_name, password,role) values ('amin', 'amin','admin');
+insert into authentication_request (user_name, password,role) values ('osama', 'osama','user');

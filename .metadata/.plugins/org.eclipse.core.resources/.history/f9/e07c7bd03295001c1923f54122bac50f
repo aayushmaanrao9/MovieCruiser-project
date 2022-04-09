@@ -1,0 +1,114 @@
+package com.cts.moviecruiser.movieportal.controller;
+
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpSession;
+import javax.validation.Valid;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Controller;
+import org.springframework.validation.BindingResult;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.ModelAttribute;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.servlet.ModelAndView;
+import org.springframework.web.servlet.view.RedirectView;
+
+import com.cts.moviecruiser.movieportal.client.AuthClient;
+import com.cts.moviecruiser.movieportal.dto.AuthenticationResponseDTO;
+import com.cts.moviecruiser.movieportal.model.AuthenticationRequest;
+import com.cts.moviecruiser.movieportal.model.LoginModel;
+import com.cts.moviecruiser.movieportal.service.LoginService;
+//import com.cts.moviecruiser.movieportal.service.MovieService;
+
+import feign.FeignException;
+import lombok.extern.slf4j.Slf4j;
+
+@Controller
+@RequestMapping
+@Slf4j
+public class LoginController {
+	@Autowired
+	LoginService loginService;
+	@Autowired
+	AuthClient authClient;
+	private static String token1 = null;
+
+	@GetMapping("/login")
+	public ModelAndView showLogin() {
+		ModelAndView mv = new ModelAndView("login");
+		mv.addObject("model", new LoginModel());
+		return mv;
+	}
+
+	@PostMapping("/login")
+	public ModelAndView performLogin(@Valid @ModelAttribute("model") LoginModel model, BindingResult result,
+			HttpServletRequest request, HttpSession session) throws FeignException {
+		ModelAndView mv = new ModelAndView("login");
+		System.out.println(result);
+
+		log.info(" Before Token generation");
+		AuthenticationResponseDTO token = null;
+		AuthenticationResponseDTO role = null;
+		try {
+			token = loginService.login(model);
+		} catch (Exception e) {
+			log.info("Exception");
+			mv.addObject("error", "Invalid Credentials");
+			return mv;
+		}
+
+		request.getSession().setAttribute("token", "Bearer " + token.getJwtAuthToken());
+		request.getSession().setAttribute("user", model.getUserName());
+
+		log.info(" After Token generation");
+
+		log.info(model.getUserName());
+		log.info("Check role in LoginController: " + authClient.getRole(model.getUserName()));
+		token1 = token.getJwtAuthToken();
+		log.info(token.getJwtAuthToken());
+
+		AuthenticationRequest authenticationrequest = authClient.getRole(model.getUserName());
+		session.setAttribute("token", token.getJwtAuthToken());
+		log.debug("session{}:", session.toString());
+
+		if (authenticationrequest.getRole().equals("admin")) {
+			log.info("Dsiplaying Admin Page");
+			return new ModelAndView(new RedirectView("movies/admin"));
+		} else {
+			log.info("Dsiplaying User Page");
+			return new ModelAndView(new RedirectView("/movies/movie-list"));
+		}
+	}
+
+/*	@GetMapping("/admin")
+	public ModelAndView admin(HttpSession session) {
+
+		if (token1 != null) {
+
+			ModelAndView mv = new ModelAndView("movie-list-admin");
+			mv.addObject("model", new LoginModel());
+			return mv;
+		} else {
+			ModelAndView mv = new ModelAndView("login");
+			mv.addObject("model", new LoginModel());
+			return mv;
+		}
+	}
+
+	@GetMapping("/user")
+	public ModelAndView user() {
+		ModelAndView mv = new ModelAndView("movie_list_customer");
+		mv.addObject("model", new LoginModel());
+		return mv;
+	}
+*/
+	@RequestMapping("/logout")
+	public String logout(HttpSession session) {
+		session.setAttribute("token", null);
+		session.setAttribute("token", "");
+		token1 = null;
+		return "login";
+	}
+
+}
